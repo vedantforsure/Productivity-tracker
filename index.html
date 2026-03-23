@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Productivity Tracker</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #131313;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+      opacity: 0;
+      animation: appFadeIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.05s forwards;
+    }
+
+@keyframes appFadeIn {
+      from { opacity: 0; transform: scale(0.96); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+    }
+
+    /* ── Title ──────────────────────────────────────────────── */
+    .title-svg {
+      display: block;
+      overflow: visible;
+    }
+
+    /* ── Timer block (animated show/hide) ───────────────────── */
+    .timer-block-outer {
+      display: none;
+      overflow: hidden;
+      max-height: 150px;
+      opacity: 0;
+      transform: translateY(8px);
+      width: 100%;
+      will-change: opacity, transform;
+      transition:
+        opacity   0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+        transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .timer-block-outer.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Collapse height AFTER opacity fades — layout shift happens invisibly */
+    .timer-block-outer.collapsing {
+      opacity: 0;
+      transform: translateY(0);
+      max-height: 0;
+      transition:
+        opacity    0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+        max-height 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.25s;
+    }
+
+    .timer-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      text-align: center;
+      width: 100%;
+      padding-bottom: 2px;
+    }
+
+    /* ── Timer text ─────────────────────────────────────────── */
+    .timer-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .timer-text {
+      font-size: 16px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.6);
+      letter-spacing: 0.16px;
+      line-height: 20px;
+    }
+
+    .timer-text .time-value {
+      color: #0081f1;
+      font-weight: 500;
+    }
+
+    .timer-subtext {
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.6);
+      letter-spacing: 0.32px;
+      line-height: 20px;
+    }
+
+    /* Pulse dot — live running indicator */
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #0081f1;
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity 0.2s cubic-bezier(0.4, 0.0, 1, 1);
+    }
+
+    /* ── Break row animated show/hide ───────────────────────── */
+    .break-row-outer {
+      opacity: 0;
+      transform: translateY(6px);
+      will-change: opacity, transform;
+      transition:
+        opacity   0.22s cubic-bezier(0.4, 0.0, 1, 1),
+        transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .break-row-outer.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .break-row-inner {
+      overflow: visible;
+    }
+
+    .timer-block-outer.running .pulse-dot {
+      opacity: 1;
+      animation: dotPulse 1.6s ease-in-out infinite;
+    }
+
+    .timer-block-outer.on-break .break-pulse {
+      opacity: 1;
+      background: #f5a623;
+      animation: dotPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes dotPulse {
+      0%, 100% { opacity: 1;   transform: scale(1); }
+      50%       { opacity: 0.3; transform: scale(0.65); }
+    }
+
+    /* ── Buttons ────────────────────────────────────────────── */
+    .buttons {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .btn {
+      position: relative;
+      width: 108px;
+      padding: 10px 0;
+      background: rgba(255, 255, 255, 0.08);
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 400;
+      color: #0081f1;
+      text-align: center;
+      letter-spacing: -0.16px;
+      line-height: 20px;
+      outline: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: visible;
+      max-height: 50px;
+      opacity: 1;
+      transform: translateY(0);
+      margin-bottom: 12px;
+      will-change: opacity, transform;
+      transition: background 0.12s ease;
+    }
+
+    .btn:last-child {
+      margin-bottom: 0;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    .btn:active {
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    /* ── Corner bracket decorations ─────────────────────────── */
+    .corner {
+      position: absolute;
+      width: 9px;
+      height: 9px;
+      pointer-events: none;
+      transition:
+        top    0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+        left   0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+        bottom 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+        right  0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .corner-tl {
+      top: -1px;
+      left: -1px;
+      border-top: 1.5px solid #0081f1;
+      border-left: 1.5px solid #0081f1;
+    }
+
+    .corner-tr {
+      top: -1px;
+      right: -1px;
+      border-top: 1.5px solid #0081f1;
+      border-right: 1.5px solid #0081f1;
+    }
+
+    .corner-bl {
+      bottom: -1px;
+      left: -1px;
+      border-bottom: 1.5px solid #0081f1;
+      border-left: 1.5px solid #0081f1;
+    }
+
+    .corner-br {
+      bottom: -1px;
+      right: -1px;
+      border-bottom: 1.5px solid #0081f1;
+      border-right: 1.5px solid #0081f1;
+    }
+
+    .btn:hover .corner-tl { top: -3.2px;    left: -3.2px; }
+    .btn:hover .corner-tr { top: -3.2px;   right: -3.2px; }
+    .btn:hover .corner-bl { bottom: -3.2px; left: -3.2px; }
+    .btn:hover .corner-br { bottom: -3.2px; right: -3.2px; }
+
+    /* ── Quit bar ───────────────────────────────────────────── */
+    .quit-bar {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn--muted {
+      color: rgba(255, 255, 255, 0.3);
+      margin-bottom: 0;
+    }
+
+    .btn--muted .corner {
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+
+    .btn--muted:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .btn--muted:active {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .esc-badge {
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 3px;
+      padding: 1px 5px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* ── Idle total ─────────────────────────────────────────── */
+    .idle-total {
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.45);
+      letter-spacing: 0.32px;
+      line-height: 20px;
+      will-change: opacity, transform;
+      transition:
+        opacity   0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+        transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    /* ── Hidden button state ────────────────────────────────── */
+    .btn.hidden {
+      max-height: 0;
+      opacity: 0;
+      transform: translateY(10px);
+      margin-bottom: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <svg class="title-svg" viewBox="0 0 560 70" width="560" height="70" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="inner-shadow" x="-5%" y="-30%" width="110%" height="160%">
+          <!-- Invert the text alpha to get the "outside" shape -->
+          <feComponentTransfer in="SourceAlpha" result="inverted">
+            <feFuncA type="table" tableValues="1 0"/>
+          </feComponentTransfer>
+          <!-- Offset + blur the inverted mask -->
+          <feOffset in="inverted" dx="2" dy="2" result="offset"/>
+          <feGaussianBlur in="offset" stdDeviation="2" result="blurred"/>
+          <!-- Flood with shadow colour -->
+          <feFlood flood-color="rgba(255,255,255,0.56)" result="color"/>
+          <!-- Clip flood to the blurred inverted mask -->
+          <feComposite in="color" in2="blurred" operator="in" result="shadow"/>
+          <!-- Clip shadow so it only shows inside the text -->
+          <feComposite in="shadow" in2="SourceAlpha" operator="in" result="inner"/>
+          <!-- Merge: original text on bottom, inner shadow on top -->
+          <feMerge>
+            <feMergeNode in="SourceGraphic"/>
+            <feMergeNode in="inner"/>
+          </feMerge>
+        </filter>
+      </defs>
+      <text
+        x="280"
+        y="54"
+        text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="56"
+        font-weight="500"
+        letter-spacing="-0.5"
+        fill="#0081f1"
+        filter="url(#inner-shadow)"
+      >Productivity Tracker</text>
+    </svg>
+
+    <div class="buttons">
+      <button class="btn" id="start-btn">
+        <span class="btn-label">Start</span>
+        <span class="corner corner-tl"></span>
+        <span class="corner corner-tr"></span>
+        <span class="corner corner-bl"></span>
+        <span class="corner corner-br"></span>
+      </button>
+
+      <button class="btn hidden" id="stop-btn">
+        <span class="btn-label">Stop</span>
+        <span class="corner corner-tl"></span>
+        <span class="corner corner-tr"></span>
+        <span class="corner corner-bl"></span>
+        <span class="corner corner-br"></span>
+      </button>
+
+      <button class="btn hidden" id="break-btn">
+        <span class="btn-label">Break</span>
+        <span class="corner corner-tl"></span>
+        <span class="corner corner-tr"></span>
+        <span class="corner corner-bl"></span>
+        <span class="corner corner-br"></span>
+      </button>
+
+    </div>
+
+    <p class="idle-total" id="idle-total" style="opacity:0;transform:translateY(6px)">Total today &mdash; <span id="idle-work-time">0m 0s</span></p>
+
+    <div class="timer-block-outer" id="timer-block">
+      <div class="timer-block">
+        <div class="break-row-outer" id="break-row-outer">
+          <div class="break-row-inner">
+            <div class="timer-row">
+              <span class="pulse-dot break-pulse"></span>
+              <p class="timer-text">
+                You have been on break for <span class="time-value" id="break-time">0m 0s</span>
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="timer-row">
+          <span class="pulse-dot"></span>
+          <p class="timer-text" id="timer-text">
+            Session <span class="time-value" id="session-time">0m 0s</span>
+          </p>
+        </div>
+        <p class="timer-subtext">Total today &mdash; <span id="work-time">0m 0s</span></p>
+        <p class="timer-subtext">Lets fking gooo!</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="quit-bar">
+    <span class="esc-badge">esc</span>
+    <button id="quit-btn" class="btn btn--muted">
+      <span class="btn-label">Quit</span>
+      <span class="corner corner-tl"></span>
+      <span class="corner corner-tr"></span>
+      <span class="corner corner-bl"></span>
+      <span class="corner corner-br"></span>
+    </button>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
