@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Productivity Tracker</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #131313;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+      opacity: 0;
+      animation: appFadeIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.05s forwards;
+    }
+
+@keyframes appFadeIn {
+      from { opacity: 0; transform: scale(0.96); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+    }
+
+    /* ── Title ──────────────────────────────────────────────── */
+    .title-svg {
+      display: block;
+      overflow: visible;
+    }
+
+    /* ── Timer block (animated show/hide) ───────────────────── */
+    .timer-block-outer {
+      display: none;
+      overflow: hidden;
+      max-height: 150px;
+      opacity: 0;
+      transform: translateY(8px);
+      width: 100%;
+      will-change: opacity, transform;
+      transition:
+        opacity   0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+        transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .timer-block-outer.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Collapse height AFTER opacity fades — layout shift happens invisibly */
+    .timer-block-outer.collapsing {
+      opacity: 0;
+      transform: translateY(0);
+      max-height: 0;
+      transition:
+        opacity    0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+        max-height 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.25s;
+    }
+
+    .timer-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      text-align: center;
+      width: 100%;
+      padding-bottom: 2px;
+    }
+
+    /* ── Timer text ─────────────────────────────────────────── */
+    .timer-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .timer-text {
+      font-size: 16px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.6);
+      letter-spacing: 0.16px;
+      line-height: 20px;
+    }
+
+    .timer-text .time-value {
+      color: #0081f1;
+      font-weight: 500;
+    }
+
+    .timer-subtext {
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.6);
+      letter-spacing: 0.32px;
+      line-height: 20px;
+    }
+
+    /* Pulse dot — live running indicator */
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #0081f1;
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity 0.2s cubic-bezier(0.4, 0.0, 1, 1);
+    }
+
+    /* ── Break row animated show/hide ───────────────────────── */
+    .break-row-outer {
+      opacity: 0;
+      transform: translateY(6px);
+      will-change: opacity, transform;
+      transition:
+        opacity   0.22s cubic-bezier(0.4, 0.0, 1, 1),
+        transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .break-row-outer.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .break-row-inner {
+      overflow: visible;
+    }
+
+    .timer-block-outer.running .pulse-dot {
+      opacity: 1;
+      animation: dotPulse 1.6s ease-in-out infinite;
+    }
+
+    .timer-block-outer.on-break .break-pulse {
+      opacity: 1;
+      background: #f5a623;
+      animation: dotPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes dotPulse {
+      0%, 100% { opacity: 1;   transform: scale(1); }
+      50%       { opacity: 0.3; transform: scale(0.65); }
+    }
+
+    /* ── Buttons ────────────────────────────────────────────── */
+    .buttons {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .btn {
+      position: relative;
+      width: 108px;
+      padding: 10px 0;
+      background: rgba(255, 255, 255, 0.08);
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 400;
+      color: #0081f1;
+      text-align: center;
+      letter-spacing: -0.16px;
+      line-height: 20px;
+      outline: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: visible;
+      max-height: 50px;
+      opacity: 1;
+      transform: translateY(0);
+      margin-bottom: 12px;
+      will-change: opacity, transform;
+      transition: background 0.12s ease;
+    }
+
+    .btn:last-child {
+      margin-bottom: 0;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    .btn:active {
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    /* ── Corner bracket decorations ─────────────────────────── */
+    .corner {
+      position: absolute;
+      width: 9px;
+      height: 9px;
+      pointer-events: none;
+      transition:
+        top    0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+        left   0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+        bottom 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+        right  0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .corner-tl {
+      top: -1px;
+      left: -1px;
+      border-top: 1.5px solid #0081f1;
+      border-left: 1.5px solid #0081f1;
+    }
+
+    .corner-tr {
+      top: -1px;
+      right: -1px;
+      border-top: 1.5px solid #0081f1;
+      border-right: 1.5px solid #0081f1;
+    }
+
+    .corner-bl {
+      bottom: -1px;
+      left: -1px;
+      border-bottom: 1.5px solid #0081f1;
+      border-left: 1.5px solid #0081f1;
+    }
+
+    .corner-br {
+      bottom: -1px;
+      right: -1px;
+      border-bottom: 1.5px solid #0081f1;
+      border-right: 1.5px solid #0081f1;
+    }
+
+    .btn:hover .corner-tl { top: -3.2px;    left: -3.2px; }
+    .btn:hover .corner-tr { top: -3.2px;   right: -3.2px; }
+    .btn:hover .corner-bl { bottom: -3.2px; left: -3.2px; }
+    .btn:hover .corner-br { bottom: -3.2px; right: -3.2px; }
+
+    /* ── Hidden button state ────────────────────────────────── */
+    .btn.hidden {
+      max-height: 0;
+      opacity: 0;
+      transform: translateY(10px);
+      margin-bottom: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      pointer-events: none;
+    }
+
+    /* ── Idle total ─────────────────────────────────────────── */
+    .idle-total {
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.45);
+      letter-spacing: 0.32px;
+      line-height: 20px;
+      will-change: opacity, transform;
+      transition:
+        opacity   0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+        transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <svg class="title-svg" viewBox="0 0 560 70" width="560" height="70" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="inner-shadow" x="-5%" y="-30%" width="110%" height="160%">
+          <feComponentTransfer in="SourceAlpha" result="inverted">
+            <feFuncA type="table" tableValues="1 0"/>
+          </feComponentTransfer>
+          <feOffset in="inverted" dx="2" dy="2" result="offset"/>
+          <feGaussianBlur in="offset" stdDeviation="2" result="blurred"/>
+          <feFlood flood-color="rgba(255,255,255,0.56)" result="color"/>
+          <feComposite in="color" in2="blurred" operator="in" result="shadow"/>
+          <feComposite in="shadow" in2="SourceAlpha" operator="in" result="inner"/>
+          <feMerge>
+            <feMergeNode in="SourceGraphic"/>
+            <feMergeNode in="inner"/>
+          </feMerge>
+        </filter>
+      </defs>
+      <text
+        x="280"
+        y="54"
+        text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="56"
+        font-weight="500"
+        letter-spacing="-0.5"
+        fill="#0081f1"
+        filter="url(#inner-shadow)"
+      >Productivity Tracker</text>
+    </svg>
+
+    <div class="buttons">
+      <button class="btn" id="start-btn">
+        <span class="btn-label">Start</span>
+        <span class="corner corner-tl"></span>
+        <span class="corner corner-tr"></span>
+        <span class="corner corner-bl"></span>
+        <span class="corner corner-br"></span>
+      </button>
+
+      <button class="btn hidden" id="stop-btn">
+        <span class="btn-label">Stop</span>
+        <span class="corner corner-tl"></span>
+        <span class="corner corner-tr"></span>
+        <span class="corner corner-bl"></span>
+        <span class="corner corner-br"></span>
+      </button>
+
+      <button class="btn hidden" id="break-btn">
+        <span class="btn-label">Break</span>
+        <span class="corner corner-tl"></span>
+        <span class="corner corner-tr"></span>
+        <span class="corner corner-bl"></span>
+        <span class="corner corner-br"></span>
+      </button>
+    </div>
+
+    <p class="idle-total" id="idle-total" style="opacity:0;transform:translateY(6px)">Total today &mdash; <span id="idle-work-time">0m 0s</span></p>
+
+    <div class="timer-block-outer" id="timer-block">
+      <div class="timer-block">
+        <div class="break-row-outer" id="break-row-outer">
+          <div class="break-row-inner">
+            <div class="timer-row">
+              <span class="pulse-dot break-pulse"></span>
+              <p class="timer-text">
+                You have been on break for <span class="time-value" id="break-time">0m 0s</span>
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="timer-row">
+          <span class="pulse-dot"></span>
+          <p class="timer-text" id="timer-text">
+            Session <span class="time-value" id="session-time">0m 0s</span>
+          </p>
+        </div>
+        <p class="timer-subtext">Total today &mdash; <span id="work-time">0m 0s</span></p>
+        <p class="timer-subtext">Lets fking gooo!</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ─── Transitions ──────────────────────────────────────────────────────────
+    const TIMING = {
+      startBtnOut:    0,
+      timerBlockIn:  90,
+      firstBtnIn:   150,
+      btnStagger:    50,
+      timerBlockOut:   0,
+      activeBtnsOut: 200,
+      idleBtnIn:     260,
+    };
+
+    const TIMER_BLOCK = {
+      offsetY:       8,
+      scale:      0.94,
+      enterDur:    320,
+      exitDur:     180,
+      enterEasing: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+      exitEasing:  'cubic-bezier(0.4, 0.0, 1, 1)',
+    };
+
+    const BUTTONS = {
+      offsetY:       6,
+      scale:      0.95,
+      enterDur:    280,
+      exitDur:     160,
+      enterEasing: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+      exitEasing:  'cubic-bezier(0.4, 0.0, 1, 1)',
+    };
+
+    function springIn(el, { offsetY, scale, enterDur, enterEasing }, delay = 0) {
+      el.style.transition = 'none';
+      el.style.opacity    = '0';
+      el.style.transform  = `translateY(${offsetY}px) scale(${scale})`;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        el.style.transition = [
+          `opacity   ${Math.round(enterDur * 0.75)}ms ${enterEasing} ${delay}ms`,
+          `transform ${enterDur}ms ${enterEasing} ${delay}ms`,
+        ].join(', ');
+        el.style.opacity   = '1';
+        el.style.transform = 'translateY(0) scale(1)';
+      }));
+    }
+
+    function collapseBtn(el, { exitDur, exitEasing }, delay = 0) {
+      el.style.transition = [
+        `opacity        ${Math.round(exitDur * 0.8)}ms ${exitEasing} ${delay}ms`,
+        `transform      ${exitDur}ms ${exitEasing} ${delay}ms`,
+        `max-height     ${exitDur}ms ${exitEasing} ${delay}ms`,
+        `margin-bottom  ${exitDur}ms ${exitEasing} ${delay}ms`,
+        `padding-top    ${exitDur}ms ${exitEasing} ${delay}ms`,
+        `padding-bottom ${exitDur}ms ${exitEasing} ${delay}ms`,
+      ].join(', ');
+      el.style.opacity       = '0';
+      el.style.transform     = `translateY(${BUTTONS.offsetY}px) scale(${BUTTONS.scale})`;
+      el.style.maxHeight     = '0';
+      el.style.marginBottom  = '0';
+      el.style.paddingTop    = '0';
+      el.style.paddingBottom = '0';
+      el.style.pointerEvents = 'none';
+    }
+
+    function expandBtn(el, delay = 0) {
+      el.style.transition    = 'none';
+      el.style.maxHeight     = '50px';
+      el.style.marginBottom  = '12px';
+      el.style.paddingTop    = '10px';
+      el.style.paddingBottom = '10px';
+      el.style.pointerEvents = 'auto';
+      springIn(el, BUTTONS, delay);
+    }
+
+    function transitionToActive({ timerBlock, startBtn, stopBtn, breakBtn }) {
+      const timers = [];
+      collapseBtn(startBtn, BUTTONS);
+      timers.push(setTimeout(() => {
+        timerBlock.style.display   = 'block';
+        timerBlock.style.maxHeight = '150px';
+        timerBlock.style.opacity   = '0';
+        timerBlock.style.transform = `translateY(${TIMER_BLOCK.offsetY}px) scale(${TIMER_BLOCK.scale})`;
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          timerBlock.style.transition = [
+            `opacity   ${Math.round(TIMER_BLOCK.enterDur * 0.75)}ms ${TIMER_BLOCK.enterEasing}`,
+            `transform ${TIMER_BLOCK.enterDur}ms ${TIMER_BLOCK.enterEasing}`,
+          ].join(', ');
+          timerBlock.style.opacity   = '1';
+          timerBlock.style.transform = 'translateY(0) scale(1)';
+        }));
+      }, TIMING.timerBlockIn));
+      [stopBtn, breakBtn].forEach((btn, i) => {
+        timers.push(setTimeout(() => expandBtn(btn), TIMING.firstBtnIn + i * TIMING.btnStagger));
+      });
+      return timers;
+    }
+
+    function transitionToIdle({ timerBlock, startBtn, stopBtn, breakBtn }) {
+      const timers = [];
+      timerBlock.style.transition = [
+        `opacity   ${Math.round(TIMER_BLOCK.exitDur * 0.8)}ms ${TIMER_BLOCK.exitEasing}`,
+        `transform ${TIMER_BLOCK.exitDur}ms ${TIMER_BLOCK.exitEasing}`,
+      ].join(', ');
+      timerBlock.style.opacity   = '0';
+      timerBlock.style.transform = `translateY(${TIMER_BLOCK.offsetY}px) scale(${TIMER_BLOCK.scale})`;
+      timers.push(setTimeout(() => {
+        [stopBtn, breakBtn].forEach((btn, i) => collapseBtn(btn, BUTTONS, i * 30));
+        timerBlock.style.transition = `max-height ${TIMER_BLOCK.exitDur}ms ${TIMER_BLOCK.exitEasing}`;
+        timerBlock.style.maxHeight  = '0';
+      }, TIMING.activeBtnsOut));
+      timers.push(setTimeout(() => expandBtn(startBtn), TIMING.idleBtnIn));
+      timers.push(setTimeout(() => {
+        timerBlock.style.display = 'none';
+      }, TIMING.idleBtnIn + BUTTONS.enterDur + 60));
+      return timers;
+    }
+
+    // ─── Persistence (localStorage) ───────────────────────────────────────────
+    function todayKey() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function loadTodaySeconds() {
+      try {
+        const raw  = localStorage.getItem('productivity-tracker');
+        const data = JSON.parse(raw);
+        if (data && data.date === todayKey()) return data.seconds || 0;
+      } catch (_) {}
+      return 0;
+    }
+
+    function saveTodaySeconds(seconds) {
+      try {
+        localStorage.setItem('productivity-tracker', JSON.stringify({ date: todayKey(), seconds }));
+      } catch (_) {}
+    }
+
+    // ─── State ────────────────────────────────────────────────────────────────
+    let state           = 'idle';
+    let workSeconds     = loadTodaySeconds();
+    let sessionSeconds  = 0;
+    let breakSeconds    = 0;
+    let workInterval    = null;
+    let sessionInterval = null;
+    let breakInterval   = null;
+    let activeTimers    = [];
+
+    // ─── DOM ──────────────────────────────────────────────────────────────────
+    const timerBlock    = document.getElementById('timer-block');
+    const workTimeEl    = document.getElementById('work-time');
+    const sessionTimeEl = document.getElementById('session-time');
+    const breakRow      = document.getElementById('break-row-outer');
+    const breakTimeEl   = document.getElementById('break-time');
+    const startBtn      = document.getElementById('start-btn');
+    const stopBtn       = document.getElementById('stop-btn');
+    const breakBtn      = document.getElementById('break-btn');
+    const breakLabel    = breakBtn.querySelector('.btn-label');
+    const idleTotalEl   = document.getElementById('idle-total');
+    const idleWorkTimeEl = document.getElementById('idle-work-time');
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+    function formatTime(seconds) {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = seconds % 60;
+      if (h > 0) return `${h}h ${m}m ${s}s`;
+      return `${m}m ${s}s`;
+    }
+
+    function updateDisplay() {
+      workTimeEl.textContent     = formatTime(workSeconds);
+      sessionTimeEl.textContent  = formatTime(sessionSeconds);
+      idleWorkTimeEl.textContent = formatTime(workSeconds);
+    }
+
+    function showIdleTotal() {
+      idleTotalEl.style.display   = 'block';
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        idleTotalEl.style.opacity   = '1';
+        idleTotalEl.style.transform = 'translateY(0)';
+      }));
+    }
+
+    function hideIdleTotal() {
+      idleTotalEl.style.opacity   = '0';
+      idleTotalEl.style.transform = 'translateY(6px)';
+      setTimeout(() => { idleTotalEl.style.display = 'none'; }, 280);
+    }
+
+    function clearActiveTimers() {
+      activeTimers.forEach(clearTimeout);
+      activeTimers = [];
+    }
+
+    // ─── State transitions ────────────────────────────────────────────────────
+    function goRunning() {
+      state = 'running';
+      clearActiveTimers();
+      hideIdleTotal();
+
+      sessionSeconds  = 0;
+      clearInterval(sessionInterval);
+      sessionInterval = setInterval(() => { sessionSeconds++; updateDisplay(); }, 1000);
+
+      timerBlock.classList.add('running');
+      activeTimers = transitionToActive({ timerBlock, startBtn, stopBtn, breakBtn });
+
+      if (!workInterval) {
+        workInterval = setInterval(() => { workSeconds++; updateDisplay(); }, 1000);
+      }
+
+      updateDisplay();
+    }
+
+    function goIdle() {
+      state = 'idle';
+      clearActiveTimers();
+
+      clearInterval(workInterval);
+      clearInterval(sessionInterval);
+      clearInterval(breakInterval);
+      workInterval    = null;
+      sessionInterval = null;
+      breakInterval   = null;
+      breakSeconds    = 0;
+      sessionSeconds  = 0;
+
+      saveTodaySeconds(workSeconds);
+
+      breakRow.classList.remove('visible');
+      timerBlock.classList.remove('running', 'on-break');
+      breakLabel.textContent = 'Break';
+
+      activeTimers = transitionToIdle({ timerBlock, startBtn, stopBtn, breakBtn });
+      activeTimers.push(setTimeout(showIdleTotal, TIMING.idleBtnIn + 50));
+    }
+
+    function goBreak() {
+      state = 'onBreak';
+
+      clearInterval(workInterval);
+      clearInterval(sessionInterval);
+      workInterval    = null;
+      sessionInterval = null;
+
+      breakSeconds = 0;
+      breakTimeEl.textContent = formatTime(0);
+      breakRow.classList.add('visible');
+
+      breakInterval = setInterval(() => {
+        breakSeconds++;
+        breakTimeEl.textContent = formatTime(breakSeconds);
+      }, 1000);
+
+      timerBlock.classList.remove('running');
+      timerBlock.classList.add('on-break');
+      breakLabel.textContent = 'Resume';
+    }
+
+    function resumeFromBreak() {
+      state = 'running';
+
+      clearInterval(breakInterval);
+      breakInterval = null;
+      breakSeconds  = 0;
+      breakRow.classList.remove('visible');
+
+      workInterval    = setInterval(() => { workSeconds++;    updateDisplay(); }, 1000);
+      sessionInterval = setInterval(() => { sessionSeconds++; updateDisplay(); }, 1000);
+
+      timerBlock.classList.remove('on-break');
+      timerBlock.classList.add('running');
+      breakLabel.textContent = 'Break';
+    }
+
+    // ─── Event listeners ──────────────────────────────────────────────────────
+    startBtn.addEventListener('click', goRunning);
+    stopBtn.addEventListener('click', goIdle);
+    breakBtn.addEventListener('click', () => {
+      if (state === 'running')      goBreak();
+      else if (state === 'onBreak') resumeFromBreak();
+    });
+
+    // ─── Initial display ──────────────────────────────────────────────────────
+    updateDisplay();
+    showIdleTotal();
+
+    // ─── Midnight reset ───────────────────────────────────────────────────────
+    function scheduleNextMidnightReset() {
+      const now      = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
+      setTimeout(() => {
+        if (state === 'idle') { workSeconds = 0; updateDisplay(); }
+        scheduleNextMidnightReset();
+      }, midnight - now);
+    }
+    scheduleNextMidnightReset();
+  </script>
+</body>
+</html>
